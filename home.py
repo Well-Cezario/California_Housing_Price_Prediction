@@ -24,34 +24,53 @@ def load_model():
 
 
 df = load_clean_data()
-gdf = load_geo_data()
+gdf_geo = load_geo_data()
 model = load_model()
 
 
-st.title('California Housing Price Prediction')
+st.title("California Housing Price Prediction")
 
-longitude = st.number_input("Longitude", value=-122.23)
-latitude = st.number_input("Latitude", value=37.88)
+counties = list(gdf_geo["name"].sort_values())
+selected_county = st.selectbox("County", counties)
 
-housing_median_age = st.number_input("Housing Median Age", value=10)
+# Seleciona somente uma linha do county escolhido
+county_data = gdf_geo[gdf_geo["name"] == selected_county].iloc[0]
 
-total_rooms = st.number_input("Total Rooms", value=800)
-total_bedrooms = st.number_input("Total Bedrooms", value=100)
-population = st.number_input("Population", value=300)
-households = st.number_input("Households", value=100)
+longitude = county_data["longitude"]
+latitude = county_data["latitude"]
 
-median_income = st.slider("Median Income", min_value=0.5,
-                          max_value=15.0, value=4.0, step=0.5)
+housing_median_age = st.number_input(
+    "Housing Median Age",
+    value=10,
+    min_value=1,
+    max_value=50
+)
 
-ocean_proximity = st.selectbox(
-    "Ocean Proximity", df['ocean_proximity'].unique())
+total_rooms = county_data["total_rooms"]
+total_bedrooms = county_data["total_bedrooms"]
+population = county_data["population"]
+households = county_data["households"]
 
-median_income_cat = st.selectbox(
-    "Median Income Category", options=[1, 2, 3, 4, 5, 6])
+median_income = st.slider(
+    "Median Income",
+    min_value=5.0,
+    max_value=100.0,
+    value=45.0,
+    step=5.0
+)
 
-rooms_per_household = st.number_input("Rooms per Household", value=7)
-bedrooms_per_room = st.number_input("Bedrooms per Room", value=0.2)
-population_per_household = st.number_input("Population per Household", value=2)
+ocean_proximity = county_data["ocean_proximity"]
+
+bins_income = [0, 1.5, 3, 4.5, 6, np.inf]
+median_income_cat = np.digitize(
+    median_income / 10,
+    bins=bins_income
+)
+
+rooms_per_household = county_data["rooms_per_household"]
+bedrooms_per_room = county_data["bedrooms_per_room"]
+population_per_household = county_data["population_per_household"]
+
 
 input_model = {
     "longitude": longitude,
@@ -61,7 +80,7 @@ input_model = {
     "total_bedrooms": total_bedrooms,
     "population": population,
     "households": households,
-    "median_income": median_income,
+    "median_income": median_income / 10,
     "ocean_proximity": ocean_proximity,
     "median_income_cat": median_income_cat,
     "rooms_per_household": rooms_per_household,
@@ -71,8 +90,13 @@ input_model = {
 
 df_input_model = pd.DataFrame([input_model])
 
+st.write(df_input_model)
+
 button_price_prediction = st.button("Predict Price")
 
 if button_price_prediction:
     predicted_price = model.predict(df_input_model)
-    st.write(f"Predicted Price: US${predicted_price[0][0]:,.2f}")
+
+    st.write(
+        f"Predicted Price: US${predicted_price[0][0]:,.2f}"
+    )
