@@ -53,6 +53,38 @@ def load_geo_data():
     return gdf_geo
 
 
+@st.cache_data
+def load_county_ocean_income():
+    housing = load_clean_data()
+    counties = gpd.read_parquet(DADOS_GEO_MEDIAN)[["name", "geometry"]]
+    points = gpd.GeoDataFrame(
+        housing[
+            ["longitude", "latitude", "ocean_proximity", "median_income"]
+        ].copy(),
+        geometry=gpd.points_from_xy(housing["longitude"], housing["latitude"]),
+        crs="EPSG:4326",
+    )
+
+    if counties.crs is None:
+        raise ValueError("County geometry data must have a coordinate reference system.")
+    if counties.crs != points.crs:
+        counties = counties.to_crs(points.crs)
+
+    joined = gpd.sjoin(points, counties, how="left", predicate="within")
+    joined["ocean_proximity"] = joined["ocean_proximity"].astype("string")
+
+    return {
+        (county, ocean_proximity): median_income
+        for (county, ocean_proximity), median_income in (
+            joined.groupby(["name", "ocean_proximity"], observed=True)[
+                "median_income"
+            ]
+            .median()
+            .items()
+        )
+    }
+
+
 @st.cache_resource
 def load_model():
     return load(MODELO_FINAL)
@@ -60,6 +92,7 @@ def load_model():
 
 df = load_clean_data()
 gdf_geo = load_geo_data()
+county_ocean_income = load_county_ocean_income()
 model = load_model()
 
 
@@ -72,12 +105,19 @@ column1, column2 = st.columns(2)
 
 with column1:
 
-    with st.form(key="form"):
-        
-        selected_county = st.selectbox("County", counties)
+    selected_county = st.selectbox("County", counties)
+    county_data = gdf_geo[gdf_geo["name"] == selected_county].iloc[0]
+    ocean_proximity_options = sorted(
+        ocean_proximity
+        for county, ocean_proximity in county_ocean_income
+        if county == selected_county
+    )
 
-        # Seleciona somente uma linha do county escolhido
-        county_data = gdf_geo[gdf_geo["name"] == selected_county].iloc[0]
+    if not ocean_proximity_options:
+        st.error(f"No ocean proximity values were found for {selected_county}.")
+        st.stop()
+
+    with st.form(key="form"):
 
         longitude = county_data["longitude"]
         latitude = county_data["latitude"]
@@ -94,19 +134,16 @@ with column1:
         population = county_data["population"]
         households = county_data["households"]
 
-        median_income = st.slider(
-            "Median Income",
-            min_value=5.0,
-            max_value=100.0,
-            value=45.0,
-            step=5.0
+        ocean_proximity = st.selectbox(
+            "Ocean Proximity",
+            ocean_proximity_options,
+            key=f"ocean_proximity_{selected_county}",
         )
 
-        ocean_proximity = county_data["ocean_proximity"]
-
+        median_income = county_ocean_income[(selected_county, ocean_proximity)]
         bins_income = [0, 1.5, 3, 4.5, 6, np.inf]
         median_income_cat = np.digitize(
-            median_income / 10,
+            median_income,
             bins=bins_income
         )
 
@@ -122,7 +159,7 @@ with column1:
             "total_bedrooms": total_bedrooms,
             "population": population,
             "households": households,
-            "median_income": median_income / 10,
+            "median_income": median_income,
             "ocean_proximity": ocean_proximity,
             "median_income_cat": median_income_cat,
             "rooms_per_household": rooms_per_household,
@@ -132,7 +169,11 @@ with column1:
 
         df_input_model = pd.DataFrame([input_model])
 
-        st.write(df_input_model[['longitude', 'latitude', 'ocean_proximity']])
+        income_display = df_input_model[
+            ["median_income", "median_income_cat"]
+        ].copy()
+        income_display["median_income"] *= 10
+        st.write(income_display)
 
         button_price_prediction = st.form_submit_button("Predict Price")
 
