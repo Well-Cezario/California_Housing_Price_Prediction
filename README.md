@@ -6,11 +6,11 @@ I also practiced building and comparing regression models, including Linear Regr
 
 As part of the project, I also developed a California Housing Price Predictor app with Streamlit. It has two views: a form where users enter housing information to get a price prediction, and a map showing the selected county. Building the app helped me apply what I learned in an interactive tool.
 
-**Try the app:** [California Housing Price Predictor](ADD_APP_LINK_HERE)
+**Try the app:** [California Housing Price Predictor](https://californiahousingpriceprediction-wgt.streamlit.app/)
 
 ### App Preview
 
-![California Housing Price Predictor app preview](ADD_APP_SCREENSHOT_PATH_HERE)
+![California Housing Price Predictor app preview](relatorios/imagens/CA_Housing_Price_Prediction.gif)
 
 
 Inspiration: [Curso Data Science Prof Chico Lucio](https://www.hashtagtreinamentos.com/) 
